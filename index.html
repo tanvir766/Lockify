@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lockify</title>
+    <script>
+      // Early protection for fetch to prevent TypeError from libraries trying to overwrite it
+      (function() {
+        try {
+          var target = window;
+          var descriptor = Object.getOwnPropertyDescriptor(target, 'fetch');
+          if (descriptor && !descriptor.set && descriptor.configurable) {
+            var originalFetch = target.fetch;
+            Object.defineProperty(target, 'fetch', {
+              get: function() { return originalFetch; },
+              set: function(v) { 
+                console.warn('Prevented fetch overwrite attempt by a library.', v); 
+              },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {
+          // Ignore errors during protection setup
+        }
+
+        // Global error logging to help diagnose "undefined is not valid JSON"
+        window.addEventListener('error', function(event) {
+          if (event.error && event.error.message && event.error.message.indexOf('is not valid JSON') !== -1) {
+            console.error('JSON Parse Error Details:', {
+              message: event.error.message,
+              stack: event.error.stack,
+              filename: event.filename,
+              lineno: event.lineno
+            });
+          }
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

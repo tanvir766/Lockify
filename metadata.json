@@ -1,0 +1,5 @@
+{
+  "name": "Lockify",
+  "description": "A secure file locker with AES encryption, Firebase storage, and an admin panel.",
+  "requestFramePermissions": []
+}

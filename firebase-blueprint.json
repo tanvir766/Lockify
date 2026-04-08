@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "FileMetadata": {
+      "title": "File Metadata",
+      "description": "Metadata for encrypted files",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "size": { "type": "number" },
+        "storagePath": { "type": "string" },
+        "encryptedKey": { "type": "string", "description": "The AES key encrypted with user's PIN/Password" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "name", "storagePath"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/files/{fileId}": {
+      "schema": "FileMetadata",
+      "description": "Metadata for all uploaded files"
+    }
+  }
+}

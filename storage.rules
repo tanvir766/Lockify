@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /files/{userId}/{fileId} {
+      // Allow read/write if the user is the owner of the folder
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow delete if the user is the owner or an admin
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId || 
+        firestore.get(/databases/ai-studio-89f6fca4-fa9e-454c-9e45-315917dac4a1/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+  }
+}

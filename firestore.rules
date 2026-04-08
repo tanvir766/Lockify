@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - role: string (required, 'user' or 'admin')
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: files
+    // Document ID: fileId (UUID)
+    // Fields:
+    //   - id: string (required)
+    //   - ownerId: string (required, matches creator's UID)
+    //   - name: string (required, max 255 chars)
+    //   - mimeType: string (required)
+    //   - size: number (required, positive)
+    //   - storagePath: string (required)
+    //   - encryptedKey: string (required)
+    //   - downloadURL: string (required, valid URL)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         request.auth.token.email == "mariaparvez100@gmail.com");
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'role', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['user', 'admin'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidFileMetadata(data) {
+      return hasRequiredFields(['id', 'ownerId', 'name', 'mimeType', 'size', 'storagePath', 'encryptedKey', 'downloadURL', 'createdAt']) &&
+             hasOnlyAllowedFields(['id', 'ownerId', 'name', 'mimeType', 'size', 'storagePath', 'encryptedKey', 'downloadURL', 'createdAt']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.ownerId is string && data.ownerId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 255 &&
+             data.mimeType is string &&
+             data.size is number && data.size >= 0 &&
+             data.storagePath is string &&
+             data.encryptedKey is string &&
+             data.downloadURL is string && isValidUrl(data.downloadURL) &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin();
+    }
+
+    // File Metadata
+    match /files/{fileId} {
+      allow read: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidFileMetadata(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && isValidFileMetadata(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+  }
+}
